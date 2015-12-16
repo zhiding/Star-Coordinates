@@ -5,31 +5,32 @@ import matplotlib.pyplot as plot
 ########################################################################################
 ## Attributes: MPG;Cylinders;Displacement;Horsepower;Weight;Acceleration;Model;Origin ##
 ########################################################################################
-def csv2dict(filepath, primary_key):
-    data_dict = {}
+def csv2mat(filepath, primary_key):
+    data_mat = []
     with open(filepath, 'rb') as csvfile:
-        items = csv.DictReader(csvfile, delimiter=';')
-        item_id = 0
+        items = csv.reader(csvfile)
         for item in items:
-            data_dict[str(item_id)] = item
-            item_id += 1
-    return data_dict
+            item = item and item[0]
+            item = item.split(';')[1:]
+            data_mat.append([str2float(value) for value in item])
+    data_mat = data_mat[1:]
+    return data_mat
 
 ################################################################
 ## Input  ==> (Dict) data_dict                                ##
 ## Output ==> (List) data_mat[size_of_dataSet * num_of_attrs] ## 
 ################################################################
-def dict2mat(data_dict):
-    mat = []
-    for key in data_dict:
-        vector = []
-        vector.append(key)
-        attrs = data_dict[key]
-        for attr in attrs:
-            value = str2float(attrs[attr])
-            vector.append(value)
-        mat.append(vector)
-    return mat
+#def dict2mat(data_dict):
+#    mat = []
+#    for key in data_dict:
+#        vector = []
+#        vector.append(key)
+#        attrs = data_dict[key]
+#        for attr in attrs:
+#            value = str2float(attrs[attr])
+#            vector.append(value)
+#        mat.append(vector)
+#    return mat
 
 ##############################################################
 ## Usage: Convert any data with Type string into Type float ##
@@ -47,23 +48,21 @@ def str2float(string, maxLength=5):
             res += (ord(string[i])-ord('a')+1)*pow(27.0, maxLength-1-i) 
     return res
 
-##############################################
-## Descript: 1. Remove colmun with data_id  ##
-##           2. Regulization in each column ##
-##############################################
+########################################
+## Usage: Regulization in each column ##
+########################################
 def dataRegulization(data_mat):
-    data_mat_wfc = [row[1:] for row in data_mat]
-    num_of_row = len(data_mat_wfc)
-    num_of_col = len(data_mat_wfc[0])
+    num_of_row = len(data_mat)
+    num_of_col = len(data_mat[0])
     data_mat_reg = [[0 for col in range(num_of_col)] for row in range(num_of_row)] 
     col_max = []
     col_min = []
     for i in range(num_of_col):
-        col_max.append(max([row[i] for row in data_mat_wfc]))
-        col_min.append(min([row[i] for row in data_mat_wfc]))    
-        col_range = col_max[i] - col_min[i]
+        col_max.append(max([row[i] for row in data_mat]))
+        col_min.append(min([row[i] for row in data_mat]))    
+        col_range = col_max[i] - col_min[i] + 0.0001
         for j in range(num_of_row):
-            data_mat_reg[j][i] = (data_mat_wfc[j][i]-col_min[i])/(col_max[i]-col_min[i])
+            data_mat_reg[j][i] = (data_mat[j][i]-col_min[i])/col_range
     return data_mat_reg 
 
 #################################################################
@@ -74,18 +73,17 @@ def nD2cc(num_of_attrs):
     cc_cos = ''
     cc_sin = ''
     for i in range(num_of_attrs):
-        cc_cos += str(np.cos(theta*i)) + ' '
-        cc_sin += str(np.sin(theta*i)) + ' '
+        cc_cos += str(np.cos(theta*(1+i))) + ' '
+        cc_sin += str(np.sin(theta*(1+i))) + ' '
     np_cc = np.matrix(cc_cos[:-1]+';'+cc_sin[:-1])
     return np_cc
 
 if __name__ == '__main__':
-    data_dict = csv2dict('./cars.csv', 'Car')
-    data_mat = dict2mat(data_dict)
+    data_mat = csv2mat('./cars.csv', 'Car')
+    #data_mat = csv2mat('./test.csv', 'Test')
     data_mat_reg = dataRegulization(data_mat)
     np_mat = np.matrix(data_mat_reg)
-
-    num_of_attrs = len(data_mat[0])-1
+    num_of_attrs = len(data_mat[0])
     np_cc = nD2cc(num_of_attrs)
     sc_mat = np.dot(np_cc, np_mat.T)
     sc_mat_len = sc_mat.size/sc_mat.ndim
