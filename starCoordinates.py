@@ -1,7 +1,8 @@
 import csv, math, re
-import numpy as np
 import matplotlib.pyplot as plot
+import numpy as np
 from matplotlib.patches import Circle
+from numpy import linalg as la
 
 ########################################################################################
 ## Attributes: MPG;Cylinders;Displacement;Horsepower;Weight;Acceleration;Model;Origin ##
@@ -82,7 +83,7 @@ def nD2cc(num_of_attrs):
 ##################################################################
 ## Usage: Display the scatter figure to show data in 2D from nD ##
 ##################################################################
-def figure(np_coord, np_data):
+def figure(np_coord, np_data, attrs):
     ## scatters
     np_osc = np.dot(np_coord, np_data.T)
     coord_x = np.array(np_coord[0,:]).tolist()
@@ -97,7 +98,10 @@ def figure(np_coord, np_data):
     for i in range(dims):
         ## lines 
         ax.plot([np_coord[0,i],0], [np_coord[1,i],0], linewidth=1.5, color='#FF6A6A')
+        ## points
         ax.plot(np_coord[0,i], np_coord[1,i], 'o', color='#7FFFD4')
+        ## annotations
+        ax.annotate(attrs[i], xy=(np_coord[0,i], np_coord[1,i]))
         ## circles 
         r = math.sqrt(np_coord[0,i]*np_coord[0,i]+np_coord[1,i]*np_coord[1,i])
         if r > r_max:
@@ -113,49 +117,124 @@ def figure(np_coord, np_data):
 ##############################################
 ## Usage: Make star coordinates orthgraphic ##
 ##############################################
-def osc(np_ori, method='rc'):
-    num_of_attrs = np_ori.size / 2
-    if method == 'em':
-        np_delta = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)])
-        [cost_ori, xx_ori, yy_ori, xy_ori] = cost(np_ori)
-        step = 0.01
-        error = 0.0001
+def osc(sc_now, Type='em', fix=[]):
+    sc_ori = sc_now
+    num_of_attrs = sc_now.size / 2
+    sc_next = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)], dtype='double') 
+    if Type == 'Leh_re':
+        coord_x = sc_now[0,:]
+        coord_y = sc_now[1,:]
+        coord_x = coord_x / la.norm(coord_x)
+        coord_y = coord_y - np.sum(np.multiply(coord_y, coord_x))*coord_x
+        sc_next[0,:] = coord_x
+        sc_next[1,:] = coord_y / la.norm(coord_y)
+        print sc_next[:,7]
+    elif Type == 're':
+        coord_x = sc_now[0,:]
+        coord_y = sc_now[1,:]
+        print sc_now
+        xreg = 0
+        yreg = 0
+        for i in fix:
+            xreg += coord_x[0,i] ** 2;
+            yreg += coord_y[0,i] ** 2;
+        co_xreg = math.sqrt(1-xreg)
+        co_yreg = math.sqrt(1-yreg)
         for i in range(num_of_attrs):
-            np_delta[0,i] = 4 * np_ori[0,i] * (xx_ori - 1) + 2 * xy_ori * np_ori[1,i]
-            np_delta[1,i] = 4 * np_ori[1,i] * (yy_ori - 1) + 2 * xy_ori * np_ori[0,i]
-        np_gen = np_ori - step * np_delta
-        [cost_gen, xx_gen, yy_gen, xy_gen] = cost(np_gen)
-        print [cost_ori, xx_ori, yy_ori, xy_ori]
-        print [cost_gen, xx_gen, yy_gen, xy_gen]
-        print np_ori
-        print np_gen
-    else:
-        pass
-    return np_gen
+            if i not in fix:
+               coord_x[0,i] *= xreg
+               coord_y[0,i] *= yreg
+        print coord_x, coord_y
+        coord_y = coord_y - np.sum(np.multiply(coord_y, coord_x))*coord_x
+        sc_next[0,:] = coord_x
+        sc_next[1,:] = coord_y / la.norm(coord_y)
+        print sc_next[:,7]
+    elif Type == 'em':
+        ## Backtrack Line Search
+        sc_next = sc_now
+        np_delta = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)], dtype='double')
+        [cost, xx, yy, xy] = costFunc(sc_now)
+        step = 1
+        alpha = 0.25
+        beta = 0.8
+        error = 0.000001
+        iterate = 9999
+        while (cost > error) and (iterate > 0):
+            for i in range(num_of_attrs):
+                if i in fix:
+                    np_delta[0,i] = 0
+                    np_delta[1,i] = 0
+                else:
+                    np_delta[0,i] = 4 * sc_next[0,i] * (xx - 1) + 2 * xy * sc_next[1,i]
+                    np_delta[1,i] = 4 * sc_next[1,i] * (yy - 1) + 2 * xy * sc_next[0,i]
+            cost_gen = cost
+            while cost_gen > cost - alpha*step*(np.sum(np.multiply(np_delta, np_delta))):
+                step = beta * step 
+                [cost_gen, xx_gen, yy_gen, xy_gen] = costFunc(sc_next-step*np_delta)
+            sc_next = sc_next - step * np_delta
+            [cost, xx, yy, xy] = [cost_gen, xx_gen, yy_gen,  xy_gen]
+            iterate = iterate - 1
+    return sc_next
 
-def cost(np_sc):
+## First Radius Next Direciton
+def FRND(sc_now, sc_prev, fix):
+    num_of_attrs = sc_now.size / 2 
+    fx = sc_now[0,fix]
+    fy = sc_now[1,fix]
+    theta = math.atan2(fy, fx)
+    scale = math.sqrt((fx**2+fy**2) / (sc_prev[0,fix]**2+sc_prev[1,fix]**2))
+    #sc_rad = sc_now.copy()
+    #sc_rad[0,fix] = math.cos(theta)
+    #sc_rad[1,fix] = math.sin(theta)
+    #sc_sca = sc_rad.copy()
+    #sc_sca[0,fix] = sc_rad[0,fix] * scale
+    #sc_sca[1,fix] = sc_rad[1,fix] * scale
+    sc_sca = sc_now.copy()
+    sc_sca[0,fix] = sc_now[0,fix] * scale
+    sc_sca[1,fix] = sc_now[1,fix] * scale
+    sc_rad = sc_sca.copy()
+    sc_rad[0,fix] = math.cos(theta)
+    sc_rad[1,fix] = math.sin(theta)
+    osc_rad = osc(sc_rad, 'em', [fix])
+    osc_sca = osc(sc_sca, 'em', [fix])
+    return [osc_rad, osc_sca]
+
+
+def costFunc(np_sc):
     num_of_attrs = np_sc.size / 2 
-    sum_of_xx = 0
-    sum_of_yy = 0
-    sum_of_xy = 0
-    for i in range(num_of_attrs):
-        sum_of_xx += np_sc[0,i] * np_sc[0,i]
-        sum_of_yy += np_sc[1,i] * np_sc[1,i]
-        sum_of_xy += np_sc[0,i] * np_sc[1,i]
+    sum_of_xx = np.sum(np.multiply(np_sc[0,:], np_sc[0,:]))
+    sum_of_yy = np.sum(np.multiply(np_sc[1,:], np_sc[1,:]))
+    sum_of_xy = np.sum(np.multiply(np_sc[0,:], np_sc[1,:]))
     cost = (sum_of_xx - 1) * (sum_of_xx - 1) + (sum_of_yy - 1) * (sum_of_yy - 1) + sum_of_xy * sum_of_xy
     return [cost, sum_of_xx, sum_of_yy, sum_of_xy]
 
-
 if __name__ == '__main__':
     data_mat = csv2mat('./cars.csv', 'Car')
+    attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
     #data_mat = csv2mat('./test.csv', 'Test')
     data_mat_reg = dataRegulization(data_mat)
     np_mat = np.matrix(data_mat_reg)
     num_of_attrs = len(data_mat[0])
     np_cc = nD2cc(num_of_attrs)
-    figure(np_cc, np_mat)
-    np_cc[:,num_of_attrs-1] *= 5
-    figure(np_cc, np_mat)
-    np_gen = osc(np_cc, 'em')
-    figure(np_gen, np_mat)
+    #np_ccc = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)])
+    #np_ccc = np_cc
+    np_ccc = np_cc.copy()
+    #figure(np_cc, np_mat, attrs)
+    np_cc[0,-1] = 0.3
+    np_cc[1,-1] = 0.4
+    #print 'np_ccc',np_ccc
+    #np_cc[0,0] = 0.5*np_cc[0,0]
+    #np_cc[1,0] = 0.5*np_cc[1,0]
+    #figure(np_cc, np_mat, attrs)
+    np_gen = osc(np_cc, 'em', [7])
+    #print costFunc(np_gen)
+    figure(np_gen, np_mat, attrs)
+    #np_gen = osc(np_cc, 'Leh_re')
+    #print costFunc(np_gen)
+    #figure(np_gen, np_mat, attrs)
+    #np_gen = osc(np_cc, 're', [7])
+    #figure(np_gen, np_mat, attrs)
+    [osc_rad, osc_sca] = FRND(np_cc,np_ccc, 7)
+    figure(osc_rad, np_mat, attrs)
+    figure(osc_sca, np_mat, attrs)
     plot.show()
