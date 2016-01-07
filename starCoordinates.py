@@ -89,7 +89,9 @@ def figure(np_coord, np_data, attrs):
     coord_x = np.array(np_coord[0,:]).tolist()
     coord_y = np.array(np_coord[1,:]).tolist()
     osc_x = np.array(np_osc[0,:]).tolist()
+    osc_x = osc_x[0]
     osc_y = np.array(np_osc[1,:]).tolist()
+    osc_y = osc_y[0]
     fig = plot.figure()
     ax = fig.add_subplot(111)
     ax.scatter(osc_x, osc_y, color='#5CACEE')
@@ -109,15 +111,36 @@ def figure(np_coord, np_data, attrs):
         circle = Circle((0.0, 0.0), radius=r, fill=False, color='#B5B5B5')
         ax.add_patch(circle)
     ## axis
+    ax.axis([-1.2, 1.2, -1.2, 1.2])
     ax.axis('equal')
-    ax.axis('scaled')
-    return 0
+    return [ osc_x, osc_y]
 
+#################################
+## Usage: Display coords in 2D ##
+#################################
+def coordsFigure(np_coord, attrs=[]):
+    dims = np_coord.size / 2
+    fig = plot.figure()
+    ax = fig.add_subplot(111)
+    for i in range(dims):
+        ax.plot([np_coord[0,i],0], [np_coord[1,i],0], linewidth=1.5, color='#FF6A6A')
+        ax.plot(np_coord[0,i], np_coord[1,i], 'o', color='#7FFFD4')
+        try:
+            ax.annotate(attrs[i], xy=(np_coord[0,i], np_coord[1,i]))
+        except:
+            pass
+        r = math.sqrt(np_coord[0,i]**2+np_coord[1,i]**2)
+        circle = Circle((0.0, 0.0), radius=r, fill=False, color='#B5B5B5')
+        ax.add_patch(circle)
+    ax.axis([-1.2, 1.2, -1.2, 1.2])
+    ax.axis('equal')
+    return 0
+      
 
 ##############################################
 ## Usage: Make star coordinates orthgraphic ##
 ##############################################
-def osc(sc_now, Type='em', fix=[]):
+def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
     sc_ori = sc_now
     num_of_attrs = sc_now.size / 2
     sc_next = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)], dtype='double') 
@@ -128,7 +151,6 @@ def osc(sc_now, Type='em', fix=[]):
         coord_y = coord_y - np.sum(np.multiply(coord_y, coord_x))*coord_x
         sc_next[0,:] = coord_x
         sc_next[1,:] = coord_y / la.norm(coord_y)
-        print sc_next[:,7]
     elif Type == 're':
         coord_x = sc_now[0,:]
         coord_y = sc_now[1,:]
@@ -158,7 +180,6 @@ def osc(sc_now, Type='em', fix=[]):
         alpha = 0.25
         beta = 0.8
         error = 0.000001
-        iterate = 9999
         while (cost > error) and (iterate > 0):
             for i in range(num_of_attrs):
                 if i in fix:
@@ -172,32 +193,32 @@ def osc(sc_now, Type='em', fix=[]):
                 step = beta * step 
                 [cost_gen, xx_gen, yy_gen, xy_gen] = costFunc(sc_next-step*np_delta)
             sc_next = sc_next - step * np_delta
-            [cost, xx, yy, xy] = [cost_gen, xx_gen, yy_gen,  xy_gen]
+            [cost, xx, yy, xy] = [cost_gen, xx_gen, yy_gen, xy_gen]
             iterate = iterate - 1
     return sc_next
 
 ## First Radius Next Direciton
 def FRND(sc_now, sc_prev, fix):
     num_of_attrs = sc_now.size / 2 
+    fx_prev = sc_prev[0,fix]
+    fy_prev = sc_prev[1,fix]
     fx = sc_now[0,fix]
     fy = sc_now[1,fix]
-    theta = math.atan2(fy, fx)
-    scale = math.sqrt((fx**2+fy**2) / (sc_prev[0,fix]**2+sc_prev[1,fix]**2))
-    #sc_rad = sc_now.copy()
-    #sc_rad[0,fix] = math.cos(theta)
-    #sc_rad[1,fix] = math.sin(theta)
-    #sc_sca = sc_rad.copy()
-    #sc_sca[0,fix] = sc_rad[0,fix] * scale
-    #sc_sca[1,fix] = sc_rad[1,fix] * scale
+    
+    theta_prev = math.atan2(fy_prev, fx_prev)
+    scale_prev = math.sqrt((fx_prev**2+fy_prev**2))
+    theta_now = math.atan2(fy, fx)
+    scale_now = math.sqrt((fx**2+fy**2))
     sc_sca = sc_now.copy()
-    sc_sca[0,fix] = sc_now[0,fix] * scale
-    sc_sca[1,fix] = sc_now[1,fix] * scale
-    sc_rad = sc_sca.copy()
-    sc_rad[0,fix] = math.cos(theta)
-    sc_rad[1,fix] = math.sin(theta)
-    osc_rad = osc(sc_rad, 'em', [fix])
+    sc_sca[0,fix] = math.cos(theta_prev) * scale_now  
+    sc_sca[1,fix] = math.sin(theta_prev) * scale_now
     osc_sca = osc(sc_sca, 'em', [fix])
-    return [osc_rad, osc_sca]
+
+    sc_rad = osc_sca.copy()
+    sc_rad[0,fix] = math.cos(theta_now) * scale_now
+    sc_rad[1,fix] = math.sin(theta_now) * scale_now
+    osc_rad = osc(sc_rad, 'em', [fix])
+    return [osc_sca, osc_rad]
 
 
 def costFunc(np_sc):
@@ -208,33 +229,127 @@ def costFunc(np_sc):
     cost = (sum_of_xx - 1) * (sum_of_xx - 1) + (sum_of_yy - 1) * (sum_of_yy - 1) + sum_of_xy * sum_of_xy
     return [cost, sum_of_xx, sum_of_yy, sum_of_xy]
 
+def coordMove(np_ori, num, x, y):
+    np_alpha = np_ori.copy()
+    for n in num:
+        np_alpha[0,n] = x[n]
+        np_alpha[1,n] = y[n]
+    return np_alpha
+
+def REandEM_demo(coords):
+    re = osc(coords, 'Leh_re')
+    em = osc(coords, 'em')
+    coordsFigure(coords,[])
+    coordsFigure(re,[])
+    coordsFigure(em,[])
+    diff(re, em)
+    return 0
+
+def diff(co,co_):
+    dims = co.size / 2
+    fig = plot.figure()
+    ax = fig.add_subplot(111)
+    for i in range(dims):
+        ax.plot([co[0,i],0], [co[1,i],0], linewidth=1.5, color='#FF6A6A')
+        ax.plot([co_[0,i],0], [co_[1,i],0], linewidth=1.5, color='#FF6A6A')
+
+        ax.plot([co[0,i],co_[0,i]], [co[1,i],co_[1,i]], linewidth=1.5, color='#FF6A6A', linestyle="--")
+
+        ax.plot(co[0,i], co[1,i], 'o', color='#7FFFD4')
+        ax.plot(co_[0,i], co_[1,i], 'o', color='#F98614')
+        try:
+            ax.annotate(attrs[i], xy=(co[0,i], co[1,i]))
+            ax.annotate(attrs[i], xy=(co_[0,i], co_[1,i]))
+        except:
+            pass
+        r = math.sqrt(co[0,i]**2+co[1,i]**2)
+        r_ = math.sqrt(co_[0,i]**2+co_[1,i]**2)
+        circle = Circle((0.0, 0.0), radius=r, fill=False, color='#B5B5B5')
+        circle_ = Circle((0.0, 0.0), radius=r_, fill=False, color='#C1D2D0')
+        ax.add_patch(circle)
+        ax.add_patch(circle_)
+    ax.axis([-1.2, 1.2, -1.2, 1.2])
+    ax.axis('equal')
+    return 0 
+
+def interaction_demo(num_of_attrs, delta_x, delta_y, iterate=5):
+    coords = nD2cc(num_of_attrs)
+    fig = plot.figure()
+    ax = fig.add_subplot(111)
+    for i in range(num_of_attrs):
+        ax.plot(coords[0,i], coords[1,i], 'o', color='#7FFFD4')
+        ax.plot([coords[0,i], 0], [coords[1,i], 0], linewidth=1.5, color='#FF6A6A')
+        r = math.sqrt(coords[0,i]**2+coords[1,i]**2)
+        circle = Circle((0.0, 0.0), radius=r, fill=False, color='#B5B5B5')
+        ax.add_patch(circle)
+    coords[0,0] += delta_x
+    coords[1,0] += delta_y
+    ax.plot([coords[0,0], coords[0,0]-delta_x], [coords[1,0], coords[1,0]-delta_y], linewidth=1.5, color='#FF6A6A', linestyle='--')
+    ax.plot(coords[0,0], coords[1,0], 'o', color='#F98614')
+    ax.plot([coords[0,0], 0], [coords[1,0], 0], linewidth=1.5, color='#FF6A6A')
+    r = math.sqrt(coords[0,0]**2+coords[1,0]**2)
+    circle = Circle((0.0, 0.0), radius=r, fill=False, color='#C1D2D0')
+    ax.add_patch(circle)
+    ax.axis([-1.2, 1.2, -1.2, 1.2])
+    ax.axis('equal')
+    ## reconditioning 
+    coords_re = osc(coords, 'Leh_re')
+    diff(coords, coords_re)
+    ## energy minimisation
+    coords_ori = coords.copy()
+    fig_em = plot.figure()
+    ax_em = fig_em.add_subplot(111)
+    for i in range(num_of_attrs):
+        ax_em.plot(coords_ori[0,i], coords_ori[1,i], 'o', color='#7FFFD4')
+        ax_em.plot([coords_ori[0,i], 0], [coords_ori[1,i], 0], linewidth=1.5, color='#FF6A6A')
+        r = math.sqrt(coords_ori[0,i]**2+coords_ori[1,i]**2)
+        circle = Circle((0.0, 0.0), radius=r, fill=False, color='#B5B5B5')
+        ax_em.add_patch(circle)
+    for it in range(iterate):
+        coords_em = osc(coords_ori, 'em', [0], iterate=iterate)
+        for i in range(num_of_attrs):
+            ax_em.plot(coords_em[0,i], coords_em[1,i], 'o', color='#F98614')
+            ax_em.plot([coords_em[0,i], 0], [coords_em[1,i], 0], linewidth=1.5, color='#FF6A6A')
+            ax_em.plot([coords_ori[0,i], coords_em[0,i]], [coords_ori[1,i], coords_em[1,i]], linewidth=1.5, color='#FF6A6A', linestyle="--")
+        coords_ori = coords_em
+    for i in range(num_of_attrs):
+        r = math.sqrt(coords_em[0,i]**2+coords_em[1,i]**2)
+        circle = Circle((0.0, 0.0), radius=r, fill=False, color='#C1D2D0')
+        ax_em.add_patch(circle)
+    ax_em.axis([-1.2, 1.2, -1.2, 1.2])
+    ax_em.axis('equal')
+    return 0
+
 if __name__ == '__main__':
-    data_mat = csv2mat('./cars.csv', 'Car')
-    attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
+    
+    ## Demo of RE and EM Algorithms 
+    #demo_coords = np.matrix([[0.66, 0.91, 0.38, -0.77, -1.17], [0.83, 0.05, -0.52, -0.09, 1.08]])
+    #REandEM_demo = REandEM_demo(demo_coords) 
+    
+    ## Demo of Interaction on RE and EM Algorithms
+    #interaction_demo(5, 0.4, -0.3, 10)
+
+    ##data_mat = csv2mat('./cars.csv', 'Car')
+    ##attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
     #data_mat = csv2mat('./test.csv', 'Test')
-    data_mat_reg = dataRegulization(data_mat)
-    np_mat = np.matrix(data_mat_reg)
-    num_of_attrs = len(data_mat[0])
-    np_cc = nD2cc(num_of_attrs)
-    #np_ccc = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)])
-    #np_ccc = np_cc
-    np_ccc = np_cc.copy()
-    #figure(np_cc, np_mat, attrs)
-    np_cc[0,-1] = 0.3
-    np_cc[1,-1] = 0.4
-    #print 'np_ccc',np_ccc
-    #np_cc[0,0] = 0.5*np_cc[0,0]
-    #np_cc[1,0] = 0.5*np_cc[1,0]
-    #figure(np_cc, np_mat, attrs)
-    np_gen = osc(np_cc, 'em', [7])
+    ##data_mat_reg = dataRegulization(data_mat)
+    ##np_mat = np.matrix(data_mat_reg)
+    ##num_of_attrs = len(data_mat[0])
+    ## nD -> 2D
+    ##np_cc = nD2cc(num_of_attrs)
+    ## origin coords
+    ##np_ori = np_cc.copy()
+    ##np_alpha = coordMove(np_ori,[-1],[0.3],[0.4])
+    ##coordsFigure(np_ori, attrs)
+    ##coordsFigure(np_alpha, attrs)
+    ##np_gen = osc(np_cc, 'em', [7])
     #print costFunc(np_gen)
-    figure(np_gen, np_mat, attrs)
+    ##figure(np_gen, np_mat, attrs)
     #np_gen = osc(np_cc, 'Leh_re')
     #print costFunc(np_gen)
     #figure(np_gen, np_mat, attrs)
     #np_gen = osc(np_cc, 're', [7])
     #figure(np_gen, np_mat, attrs)
-    [osc_rad, osc_sca] = FRND(np_cc,np_ccc, 7)
-    figure(osc_rad, np_mat, attrs)
-    figure(osc_sca, np_mat, attrs)
+    ##[osc_rad, osc_sca] = FRND(np_cc,np_ori, 7)
+    ##figure(osc_rad, np_mat, attrs)
     plot.show()
