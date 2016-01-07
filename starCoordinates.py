@@ -78,6 +78,7 @@ def nD2cc(num_of_attrs):
         cc_cos += str(np.cos(theta*(1+i))) + ' '
         cc_sin += str(np.sin(theta*(1+i))) + ' '
     np_cc = np.matrix(cc_cos[:-1]+';'+cc_sin[:-1])
+
     return np_cc
 
 ##################################################################
@@ -141,7 +142,7 @@ def coordsFigure(np_coord, attrs=[]):
 ## Usage: Make star coordinates orthgraphic ##
 ##############################################
 def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
-    sc_ori = sc_now
+    sc_ori = sc_now.copy()
     num_of_attrs = sc_now.size / 2
     sc_next = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)], dtype='double') 
     if Type == 'Leh_re':
@@ -179,15 +180,39 @@ def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
         step = 1
         alpha = 0.25
         beta = 0.8
-        error = 0.000001
+        error = 0.001
         while (cost > error) and (iterate > 0):
+            rad_delta_sum = 0.0
+            direct_delta_sum = 0.0
+            for i in rad:
+                rad_delta_sum += (math.sqrt(sc_next[0,i]**2+sc_next[1,i]**2)-math.sqrt(sc_ori[0,i]**2+sc_ori[1,i]**2))**2
+            for i in direct:
+                direct_delta_sum += ((sc_next[0,i]*sc_ori[0,i]+sc_next[1,i]*sc_ori[1,i])/(math.sqrt(sc_next[0,i]**2+sc_next[1,i]**2)*math.sqrt(sc_ori[0,i]**2+sc_ori[1,i]**2))-1)**2 
             for i in range(num_of_attrs):
+                x = sc_next[0,i]
+                y = sc_next[1,i]
+                sr = math.sqrt(x**2+y**2)
+                x0 = sc_ori[0,i]
+                y0 = sc_ori[1,i]
+                sr0 = math.sqrt(x0**2+y0**2)
+
+                np_delta[0,i] = x * (xx - 1) + 0.5 * xy * x
+                np_delta[1,i] = y * (yy - 1) + 0.5 * xy * y
+
+                if i in rad:
+                    np_delta[0,i] *= 0.3
+                    np_delta[0,i] += 0.7 * rad_delta_sum * x * (1 - sr0 / sr)
+                    np_delta[1,i] *= 0.3
+                    np_delta[1,i] = 0.7 * rad_delta_sum * y * (1 - sr0 / sr)
+                if i in direct:
+                    np_delta[0,i] *= 0.3
+                    np_delta[0,i] += 0.7 * direct_delta_sum*((x*x0+y*y0)/(sr*sr0)-1)/sr0*(x0*y**2-y0*x*y)/sr**3
+                    np_delta[1,i] *= 0.3
+                    np_delta[1,i] += 0.7 * direct_delta_sum*((x*x0+y*y0)/(sr*sr0)-1)/sr0*(x0*y**2-y0*x*y)/sr**3
                 if i in fix:
                     np_delta[0,i] = 0
                     np_delta[1,i] = 0
-                else:
-                    np_delta[0,i] = 4 * sc_next[0,i] * (xx - 1) + 2 * xy * sc_next[1,i]
-                    np_delta[1,i] = 4 * sc_next[1,i] * (yy - 1) + 2 * xy * sc_next[0,i]
+
             cost_gen = cost
             while cost_gen > cost - alpha*step*(np.sum(np.multiply(np_delta, np_delta))):
                 step = beta * step 
@@ -231,12 +256,13 @@ def costFunc(np_sc):
 
 def coordMove(np_ori, num, x, y):
     np_alpha = np_ori.copy()
-    for n in num:
-        np_alpha[0,n] = x[n]
-        np_alpha[1,n] = y[n]
+    for n in range(len(num)):
+        np_alpha[0,num[n]] = x[n]
+        np_alpha[1,num[n]] = y[n]
     return np_alpha
 
-def REandEM_demo(coords):
+def REandEM_demo():
+    coords = np.matrix([[0.66, 0.91, 0.38, -0.77, -1.17], [0.83, 0.05, -0.52, -0.09, 1.08]])
     re = osc(coords, 'Leh_re')
     em = osc(coords, 'em')
     coordsFigure(coords,[])
@@ -271,8 +297,26 @@ def diff(co,co_):
     ax.axis([-1.2, 1.2, -1.2, 1.2])
     ax.axis('equal')
     return 0 
+def conditional_demo():
+    coords = nD2cc(7)
+    coordsFigure(coords)
+    coords = coordMove(coords, [1,3,5], [-0.3,-0.7,0.8], [0.7, 0.4, -0.8])
+    coordsFigure(coords)
+    coords_fix = osc(coords, 'em', fix=[1,4])
+    coordsFigure(coords_fix)
+    coords_rad = osc(coords, 'em', rad=[1,4])
+    coordsFigure(coords_rad)
+    coords_direct = osc(coords, 'em', direct=[1,4])
+    coordsFigure(coords_direct)
+    return 0
+def fig_point(ax, coords):
+    return 0
 
-def interaction_demo(num_of_attrs, delta_x, delta_y, iterate=5):
+def interaction_demo():
+    num_of_attrs = 5
+    delta_x = 0.4
+    delta_y = 0.3
+    iterate = 5
     coords = nD2cc(num_of_attrs)
     fig = plot.figure()
     ax = fig.add_subplot(111)
@@ -323,26 +367,23 @@ def interaction_demo(num_of_attrs, delta_x, delta_y, iterate=5):
 if __name__ == '__main__':
     
     ## Demo of RE and EM Algorithms 
-    #demo_coords = np.matrix([[0.66, 0.91, 0.38, -0.77, -1.17], [0.83, 0.05, -0.52, -0.09, 1.08]])
-    #REandEM_demo = REandEM_demo(demo_coords) 
+    #REandEM_demo = REandEM_demo() 
     
     ## Demo of Interaction on RE and EM Algorithms
-    #interaction_demo(5, 0.4, -0.3, 10)
+    #interaction_demo()
 
-    ##data_mat = csv2mat('./cars.csv', 'Car')
-    ##attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
+    ## Demo of Conditional Interaction on EM Algorithms
+    conditional_demo()
+    data_mat = csv2mat('./cars.csv', 'Car')
+    attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
     #data_mat = csv2mat('./test.csv', 'Test')
-    ##data_mat_reg = dataRegulization(data_mat)
-    ##np_mat = np.matrix(data_mat_reg)
-    ##num_of_attrs = len(data_mat[0])
+    data_mat_reg = dataRegulization(data_mat)
+    np_mat = np.matrix(data_mat_reg)
+    num_of_attrs = len(data_mat[0])
     ## nD -> 2D
-    ##np_cc = nD2cc(num_of_attrs)
+    np_cc = nD2cc(num_of_attrs)
     ## origin coords
-    ##np_ori = np_cc.copy()
-    ##np_alpha = coordMove(np_ori,[-1],[0.3],[0.4])
     ##coordsFigure(np_ori, attrs)
-    ##coordsFigure(np_alpha, attrs)
-    ##np_gen = osc(np_cc, 'em', [7])
     #print costFunc(np_gen)
     ##figure(np_gen, np_mat, attrs)
     #np_gen = osc(np_cc, 'Leh_re')
