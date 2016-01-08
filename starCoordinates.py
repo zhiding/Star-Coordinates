@@ -180,7 +180,7 @@ def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
         step = 1
         alpha = 0.25
         beta = 0.8
-        error = 0.001
+        error = 0.000001
         while (cost > error) and (iterate > 0):
             rad_delta_sum = 0.0
             direct_delta_sum = 0.0
@@ -196,23 +196,22 @@ def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
                 y0 = sc_ori[1,i]
                 sr0 = math.sqrt(x0**2+y0**2)
 
-                np_delta[0,i] = x * (xx - 1) + 0.5 * xy * x
-                np_delta[1,i] = y * (yy - 1) + 0.5 * xy * y
+                np_delta[0,i] = 4 * x * (xx - 1) + 2 * xy * x
+                np_delta[1,i] = 4 * y * (yy - 1) + 2 * xy * y
 
                 if i in rad:
                     np_delta[0,i] *= 0.3
-                    np_delta[0,i] += 0.7 * rad_delta_sum * x * (1 - sr0 / sr)
                     np_delta[1,i] *= 0.3
-                    np_delta[1,i] = 0.7 * rad_delta_sum * y * (1 - sr0 / sr)
+                    np_delta[0,i] += 0.7 * 4 * rad_delta_sum * x * (1 - sr0 / sr)
+                    np_delta[1,i] += 0.7 * 4 * rad_delta_sum * y * (1 - sr0 / sr)
                 if i in direct:
                     np_delta[0,i] *= 0.3
-                    np_delta[0,i] += 0.7 * direct_delta_sum*((x*x0+y*y0)/(sr*sr0)-1)/sr0*(x0*y**2-y0*x*y)/sr**3
                     np_delta[1,i] *= 0.3
-                    np_delta[1,i] += 0.7 * direct_delta_sum*((x*x0+y*y0)/(sr*sr0)-1)/sr0*(x0*y**2-y0*x*y)/sr**3
+                    np_delta[0,i] += 0.7 * 4 * direct_delta_sum*((x*x0+y*y0)/(sr*sr0)-1)/sr0*(x0*y**2-y0*x*y)/sr**3
+                    np_delta[1,i] += 0.7 * 4 * direct_delta_sum*((x*x0+y*y0)/(sr*sr0)-1)/sr0*(y0*x**2-x0*x*y)/sr**3
                 if i in fix:
                     np_delta[0,i] = 0
                     np_delta[1,i] = 0
-
             cost_gen = cost
             while cost_gen > cost - alpha*step*(np.sum(np.multiply(np_delta, np_delta))):
                 step = beta * step 
@@ -297,35 +296,92 @@ def diff(co,co_):
     ax.axis([-1.2, 1.2, -1.2, 1.2])
     ax.axis('equal')
     return 0 
+
 def conditional_demo():
     coords = nD2cc(7)
+    coords = coordMove(coords, [1,3,5], [-0.2, -0.4, 0.8], [0.4, -0.5, -0.8])
     coordsFigure(coords)
-    coords = coordMove(coords, [1,3,5], [-0.3,-0.7,0.8], [0.7, 0.4, -0.8])
-    coordsFigure(coords)
-    coords_fix = osc(coords, 'em', fix=[1,4])
-    coordsFigure(coords_fix)
-    coords_rad = osc(coords, 'em', rad=[1,4])
-    coordsFigure(coords_rad)
-    coords_direct = osc(coords, 'em', direct=[1,4])
-    coordsFigure(coords_direct)
+
+    coords_fix = osc(coords, 'em', fix=[1,6])
+    print costFunc(coords_fix)
+    fig_fix = plot.figure()
+    ax_fix = fig_fix.add_subplot(111)
+    add_point(ax_fix, coords_fix, color='#F98614')
+    add_point(ax_fix, coords)
+    add_p2p(ax_fix, coords, coords_fix)
+    add_o2p(ax_fix, coords)
+    add_o2p(ax_fix, coords_fix)
+    add_circle(ax_fix, coords)
+    add_circle(ax_fix, coords_fix)
+    ax_fix.axis([-1.2, 1.2, -1.2, 1.2])
+    ax_fix.axis('equal')
+
+    coords_rad = osc(coords, 'em', rad=[1,6])
+    print costFunc(coords_rad)
+    fig_rad = plot.figure()
+    ax_rad = fig_rad.add_subplot(111)
+    add_point(ax_rad, coords_rad, color='#F98614')
+    add_point(ax_rad, coords)
+    add_p2p(ax_rad, coords, coords_rad)
+    add_o2p(ax_rad, coords)
+    add_o2p(ax_rad, coords_rad)
+    add_circle(ax_rad, coords)
+    add_circle(ax_rad, coords_rad)
+    ax_rad.axis([-1.2, 1.2, -1.2, 1.2])
+    ax_rad.axis('equal')
+
+    coords_direct = osc(coords, 'em', direct=[1,6])
+    print costFunc(coords_direct)
+    fig_direct = plot.figure()
+    ax_direct = fig_direct.add_subplot(111)
+    add_point(ax_direct, coords_direct, color='#F98614')
+    add_point(ax_direct, coords)
+    add_p2p(ax_direct, coords, coords_direct)
+    add_o2p(ax_direct, coords)
+    add_o2p(ax_direct, coords_direct)
+    add_circle(ax_direct, coords)
+    add_circle(ax_direct, coords_fix)
+    ax_direct.axis([-1.2, 1.2, -1.2, 1.2])
+    ax_direct.axis('equal')
     return 0
-def fig_point(ax, coords):
+
+def add_point(ax, coords, color='#7FFFD4'):
+    dims = coords.size / 2
+    for i in range(dims):
+        ax.plot(coords[0,i], coords[1,i], 'o', color=color)
+    return 0
+
+def add_circle(ax, coords):
+    dims = coords.size / 2
+    for i in range(dims):
+        r = math.sqrt(coords[0,i]**2+coords[1,i]**2)
+        circle = Circle((0.0, 0.0), radius=r, fill=False, color='#B5B5B5')
+        ax.add_patch(circle)
+    return 0
+
+def add_o2p(ax, co):
+    dims = co.size / 2 
+    for i in range(dims):
+        ax.plot([co[0,i], 0], [co[1,i], 0], linewidth=1.5, color='#FF6A6A')
+    return 0
+
+def add_p2p(ax, co, co_):
+    dims = co.size / 2 
+    for i in range(dims):
+        ax.plot([co[0,i], co_[0,i]], [co[1,i], co_[1,i]], linewidth=1.5, color='#FF6A6A', linestyle='--')
     return 0
 
 def interaction_demo():
     num_of_attrs = 5
-    delta_x = 0.4
-    delta_y = 0.3
+    delta_x = 0.2
+    delta_y = 0.1
     iterate = 5
     coords = nD2cc(num_of_attrs)
     fig = plot.figure()
     ax = fig.add_subplot(111)
-    for i in range(num_of_attrs):
-        ax.plot(coords[0,i], coords[1,i], 'o', color='#7FFFD4')
-        ax.plot([coords[0,i], 0], [coords[1,i], 0], linewidth=1.5, color='#FF6A6A')
-        r = math.sqrt(coords[0,i]**2+coords[1,i]**2)
-        circle = Circle((0.0, 0.0), radius=r, fill=False, color='#B5B5B5')
-        ax.add_patch(circle)
+    add_point(ax, coords, '#7FFFD4')
+    add_o2p(ax, coords)
+    add_circle(ax, coords)
     coords[0,0] += delta_x
     coords[1,0] += delta_y
     ax.plot([coords[0,0], coords[0,0]-delta_x], [coords[1,0], coords[1,0]-delta_y], linewidth=1.5, color='#FF6A6A', linestyle='--')
@@ -343,23 +399,16 @@ def interaction_demo():
     coords_ori = coords.copy()
     fig_em = plot.figure()
     ax_em = fig_em.add_subplot(111)
-    for i in range(num_of_attrs):
-        ax_em.plot(coords_ori[0,i], coords_ori[1,i], 'o', color='#7FFFD4')
-        ax_em.plot([coords_ori[0,i], 0], [coords_ori[1,i], 0], linewidth=1.5, color='#FF6A6A')
-        r = math.sqrt(coords_ori[0,i]**2+coords_ori[1,i]**2)
-        circle = Circle((0.0, 0.0), radius=r, fill=False, color='#B5B5B5')
-        ax_em.add_patch(circle)
+    add_point(ax_em, coords_ori, '#7FFFD4')
+    add_o2p(ax_em, coords_ori)
+    add_circle(ax_em, coords_ori)
     for it in range(iterate):
         coords_em = osc(coords_ori, 'em', [0], iterate=iterate)
-        for i in range(num_of_attrs):
-            ax_em.plot(coords_em[0,i], coords_em[1,i], 'o', color='#F98614')
-            ax_em.plot([coords_em[0,i], 0], [coords_em[1,i], 0], linewidth=1.5, color='#FF6A6A')
-            ax_em.plot([coords_ori[0,i], coords_em[0,i]], [coords_ori[1,i], coords_em[1,i]], linewidth=1.5, color='#FF6A6A', linestyle="--")
+        add_point(ax_em, coords_em, '#F98614')
+        add_o2p(ax_em, coords_em)
+        add_p2p(ax_em, coords_em, coords_ori)
         coords_ori = coords_em
-    for i in range(num_of_attrs):
-        r = math.sqrt(coords_em[0,i]**2+coords_em[1,i]**2)
-        circle = Circle((0.0, 0.0), radius=r, fill=False, color='#C1D2D0')
-        ax_em.add_patch(circle)
+    add_circle(ax_em, coords_em)
     ax_em.axis([-1.2, 1.2, -1.2, 1.2])
     ax_em.axis('equal')
     return 0
@@ -373,7 +422,11 @@ if __name__ == '__main__':
     #interaction_demo()
 
     ## Demo of Conditional Interaction on EM Algorithms
-    conditional_demo()
+    #conditional_demo()
+    
+    ## Demo of Morphing
+
+
     data_mat = csv2mat('./cars.csv', 'Car')
     attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
     #data_mat = csv2mat('./test.csv', 'Test')
