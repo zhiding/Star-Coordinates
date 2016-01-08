@@ -3,6 +3,7 @@ import matplotlib.pyplot as plot
 import numpy as np
 from matplotlib.patches import Circle
 from numpy import linalg as la
+import random
 
 ########################################################################################
 ## Attributes: MPG;Cylinders;Displacement;Horsepower;Weight;Acceleration;Model;Origin ##
@@ -75,8 +76,8 @@ def nD2cc(num_of_attrs):
     cc_cos = ''
     cc_sin = ''
     for i in range(num_of_attrs):
-        cc_cos += str(np.cos(theta*(1+i))) + ' '
-        cc_sin += str(np.sin(theta*(1+i))) + ' '
+        cc_cos += str(np.cos(theta*(i))) + ' '
+        cc_sin += str(np.sin(theta*(i))) + ' '
     np_cc = np.matrix(cc_cos[:-1]+';'+cc_sin[:-1])
 
     return np_cc
@@ -141,7 +142,7 @@ def coordsFigure(np_coord, attrs=[]):
 ##############################################
 ## Usage: Make star coordinates orthgraphic ##
 ##############################################
-def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
+def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=50):
     sc_ori = sc_now.copy()
     num_of_attrs = sc_now.size / 2
     sc_next = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)], dtype='double') 
@@ -154,9 +155,9 @@ def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
         sc_next[1,:] = coord_y / la.norm(coord_y)
     elif Type == 'em':
         ## Backtrack Line Search
-        sc_next = sc_now
+        sc_next = sc_now.copy()
         np_delta = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)], dtype='double')
-        [cost, xx, yy, xy] = costFunc(sc_now)
+        [cost, xx, yy, xy] = costFunc(sc_next)
         step = 1
         alpha = 0.25
         beta = 0.8
@@ -176,8 +177,8 @@ def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
                 y0 = sc_ori[1,i]
                 sr0 = math.sqrt(x0**2+y0**2)
 
-                np_delta[0,i] = 4 * x * (xx - 1) + 2 * xy * x
-                np_delta[1,i] = 4 * y * (yy - 1) + 2 * xy * y
+                np_delta[0,i] = 4 * x * (xx - 1) + 2 * xy * y
+                np_delta[1,i] = 4 * y * (yy - 1) + 2 * xy * x
 
                 if i in rad:
                     np_delta[0,i] *= 0.3
@@ -192,7 +193,7 @@ def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
                 if i in fix:
                     np_delta[0,i] = 0
                     np_delta[1,i] = 0
-            cost_gen = cost
+            cost_gen = costFunc(sc_next-step*np_delta)[0]
             while cost_gen > cost - alpha*step*(np.sum(np.multiply(np_delta, np_delta))):
                 step = beta * step 
                 [cost_gen, xx_gen, yy_gen, xy_gen] = costFunc(sc_next-step*np_delta)
@@ -230,7 +231,7 @@ def costFunc(np_sc):
     sum_of_xx = np.sum(np.multiply(np_sc[0,:], np_sc[0,:]))
     sum_of_yy = np.sum(np.multiply(np_sc[1,:], np_sc[1,:]))
     sum_of_xy = np.sum(np.multiply(np_sc[0,:], np_sc[1,:]))
-    cost = (sum_of_xx - 1) * (sum_of_xx - 1) + (sum_of_yy - 1) * (sum_of_yy - 1) + sum_of_xy * sum_of_xy
+    cost = (sum_of_xx - 1) ** 2 + (sum_of_yy - 1) ** 2 + sum_of_xy ** 2
     return [cost, sum_of_xx, sum_of_yy, sum_of_xy]
 
 def coordMove(np_ori, num, x, y):
@@ -339,7 +340,7 @@ def add_circle(ax, coords):
 def add_o2p(ax, co):
     dims = co.size / 2 
     for i in range(dims):
-        ax.plot([co[0,i], 0], [co[1,i], 0], linewidth=0.5, color='#FF6A6A')
+        ax.plot([co[0,i], 0], [co[1,i], 0], linewidth=1.5, color='#FF6A6A')
     return 0
 
 def add_p2p(ax, co, co_):
@@ -390,6 +391,31 @@ def interaction_demo():
     ax_em.axis('equal')
     return 0
 
+def morphing(start, end, k=100, method='simple', alg='em'):
+    fig = plot.figure()
+    ax = fig.add_subplot(111)
+    med = start.copy()
+    for i in range(k+1):
+        if method == 'simple':
+            med = start * (1-1.0*i/k) + end * 1.0*i/k
+        elif method == 'blending':
+            med = start * (1-1.0*i/k) + end * 1.0*i/k
+            if alg == 're':
+                med = osc(med, 're')
+            else:
+                med = osc(med, 'em')
+        elif method == 'stepwise':
+            med = med * (1-1.0*i/k) + end * 1.0*i/k
+            if alg == 're':
+                med = osc(med, 're')
+            else:
+                med = osc(med, 'em')
+        add_point(ax, med)
+        add_o2p(ax, med)
+    ax.axis('equal')
+    ax.axis('scaled')
+    return 0
+
 def morphing_demo(k=100, method='simple', alg='em'):
     start = nD2cc(5)
     end = coordMove(start, [1, 2, 4], [-0.3, -0.4, -0.5], [0.6, -0.3, -0.2])
@@ -430,6 +456,88 @@ def morphing_demo(k=100, method='simple', alg='em'):
     ax.axis('scaled')
     return 0
 
+def genCirclenum(ox, oy, r_max, n=2000):
+    circle = [[],[]]
+    for i in range(n):
+        sign_x = 2 * int(random.random() > 0.5) - 1
+        sign_y = 2 * int(random.random() < 0.5) - 1
+        r = random.random()*r_max
+        x = random.random()*r*sign_x-ox
+        y = math.sqrt(r**2-(x+ox)**2)*sign_y-oy
+        circle[0].append(x)
+        circle[1].append(y)
+    circle = np.matrix(circle)
+    return circle 
+
+def application_demo():
+    n = 500
+    data1 = genCirclenum(-0.6, 0.6, 0.1, n)
+    data2 = genCirclenum(0.1, 0.3, 0.1, n)
+    data3 = genCirclenum(-0.1, -0.1, 0.1, n)
+
+    start = osc(nD2cc(5), 're')
+    end = start.copy()
+    end[:,3] = 0.5*end[:,3]+1.2*end[:,4]
+
+    fig_s = plot.figure()
+    ax_s = fig_s.add_subplot(111)
+    add_point(ax_s, data1, color='#FFCC5C')
+    add_point(ax_s, data2, color='#66CCFF')
+    add_point(ax_s, data3, color='#68C4AF')
+    add_point(ax_s, start)
+    add_point(ax_s, end[:,3], color='#F98614')
+    add_o2p(ax_s, start)
+    add_o2p(ax_s, end[:,3])
+    add_p2p(ax_s, start[:,3], end[:,3])
+    add_circle(ax_s, start)
+    ax_s.axis('equal')
+    ax_s.axis('scaled')
+
+    inv = start.T*(start*start.T)**(-1)
+    end1 = osc(end, 'em', fix=[3])
+    end2 = osc(end, 'em', rad=[3])
+    end3 = osc(end, 'em', direct=[3])
+    ends = [end1, end2, end3]
+    for e in ends:
+        A = e*inv
+        cos = 0.5 * (A[0,0] + A[1,1])
+        A = np.matrix([[cos, -math.sqrt(1-cos**2)],[math.sqrt(1-cos**2), cos]])
+        d1 = A*data1 
+        d2 = A*data2 
+        d3 = A*data3 
+        fig = plot.figure()
+        ax = fig.add_subplot(111)
+        add_point(ax, d1, color='#FFCC5C')
+        add_point(ax, d2, color='#66CCFF')
+        add_point(ax, d3, color='#68C4AF')
+        add_point(ax, e)
+        add_o2p(ax, e)
+        add_circle(ax, e)
+        ax.axis('equal')
+        ax.axis('scaled')
+    k = 50
+    for e in ends:
+        fig_m = plot.figure()
+        ax_m = fig_m.add_subplot(111)
+        med = start.copy()
+        for i in range(k+1):
+            med = med * (1-1.0*i/k) + end * 1.0*i/k
+            med = osc(med, 'em')
+            mA = med*inv
+            cos = 0.5*(A[0,0]+A[1,1])
+            A = np.matrix([[cos, -math.sqrt(1-cos**2)],[math.sqrt(1-cos**2), cos]])
+            d1 = A*data1 
+            d2 = A*data2 
+            d3 = A*data3 
+            add_point(ax, d1, color='#FFCC5C')
+            add_point(ax, d2, color='#66CCFF')
+            add_point(ax, d3, color='#68C4AF')
+            add_point(ax_m , med)
+            add_o2p(ax_m, med)
+        ax_m.axis('equal')
+        ax_m.axis('scaled')
+    return 0
+
 if __name__ == '__main__':
     
     ## Demo of RE and EM Algorithms 
@@ -443,8 +551,11 @@ if __name__ == '__main__':
     
     ## Demo of Morphing
     #morphing_demo(method='simple')
-    #morphing_demo(method='blending', alg='re')
-    #morphing_demo(method='stepwise', alg='re')
+    #morphing_demo(method='blending', alg='end    #morphing_demo(method='stepwise', alg='re')
+
+    ## Demo 
+    application_demo()
+    
 
     data_mat = csv2mat('./cars.csv', 'Car')
     attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
