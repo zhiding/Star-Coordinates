@@ -145,33 +145,13 @@ def osc(sc_now, Type='em', fix=[], rad=[], direct=[], iterate=9999):
     sc_ori = sc_now.copy()
     num_of_attrs = sc_now.size / 2
     sc_next = np.matrix([[0 for i in range(num_of_attrs)] for j in range(2)], dtype='double') 
-    if Type == 'Leh_re':
+    if Type == 're':
         coord_x = sc_now[0,:]
         coord_y = sc_now[1,:]
         coord_x = coord_x / la.norm(coord_x)
         coord_y = coord_y - np.sum(np.multiply(coord_y, coord_x))*coord_x
         sc_next[0,:] = coord_x
         sc_next[1,:] = coord_y / la.norm(coord_y)
-    elif Type == 're':
-        coord_x = sc_now[0,:]
-        coord_y = sc_now[1,:]
-        print sc_now
-        xreg = 0
-        yreg = 0
-        for i in fix:
-            xreg += coord_x[0,i] ** 2;
-            yreg += coord_y[0,i] ** 2;
-        co_xreg = math.sqrt(1-xreg)
-        co_yreg = math.sqrt(1-yreg)
-        for i in range(num_of_attrs):
-            if i not in fix:
-               coord_x[0,i] *= xreg
-               coord_y[0,i] *= yreg
-        print coord_x, coord_y
-        coord_y = coord_y - np.sum(np.multiply(coord_y, coord_x))*coord_x
-        sc_next[0,:] = coord_x
-        sc_next[1,:] = coord_y / la.norm(coord_y)
-        print sc_next[:,7]
     elif Type == 'em':
         ## Backtrack Line Search
         sc_next = sc_now
@@ -303,7 +283,6 @@ def conditional_demo():
     coordsFigure(coords)
 
     coords_fix = osc(coords, 'em', fix=[1,6])
-    print costFunc(coords_fix)
     fig_fix = plot.figure()
     ax_fix = fig_fix.add_subplot(111)
     add_point(ax_fix, coords_fix, color='#F98614')
@@ -317,7 +296,6 @@ def conditional_demo():
     ax_fix.axis('equal')
 
     coords_rad = osc(coords, 'em', rad=[1,6])
-    print costFunc(coords_rad)
     fig_rad = plot.figure()
     ax_rad = fig_rad.add_subplot(111)
     add_point(ax_rad, coords_rad, color='#F98614')
@@ -331,7 +309,6 @@ def conditional_demo():
     ax_rad.axis('equal')
 
     coords_direct = osc(coords, 'em', direct=[1,6])
-    print costFunc(coords_direct)
     fig_direct = plot.figure()
     ax_direct = fig_direct.add_subplot(111)
     add_point(ax_direct, coords_direct, color='#F98614')
@@ -362,7 +339,7 @@ def add_circle(ax, coords):
 def add_o2p(ax, co):
     dims = co.size / 2 
     for i in range(dims):
-        ax.plot([co[0,i], 0], [co[1,i], 0], linewidth=1.5, color='#FF6A6A')
+        ax.plot([co[0,i], 0], [co[1,i], 0], linewidth=0.5, color='#FF6A6A')
     return 0
 
 def add_p2p(ax, co, co_):
@@ -413,6 +390,46 @@ def interaction_demo():
     ax_em.axis('equal')
     return 0
 
+def morphing_demo(k=100, method='simple', alg='em'):
+    start = nD2cc(5)
+    end = coordMove(start, [1, 2, 4], [-0.3, -0.4, -0.5], [0.6, -0.3, -0.2])
+    start = osc(start, 'em')
+    end = osc(end, 'em', fix=[1, 4])
+
+    #fig_ex = plot.figure()
+    #ax_ex = fig_ex.add_subplot(111)
+    #add_point(ax_ex, start)
+    #add_point(ax_ex, end, color='#F98614')
+    #add_o2p(ax_ex, start)
+    #add_o2p(ax_ex, end)
+    #add_circle(ax_ex, start)
+    #ax_ex.axis('equal')
+    #ax_ex.axis('scaled')
+
+    fig = plot.figure()
+    ax = fig.add_subplot(111)
+    med = start.copy()
+    for i in range(k+1):
+        if method == 'simple':
+            med = start * (1-1.0*i/k) + end * 1.0*i/k
+        elif method == 'blending':
+            med = start * (1-1.0*i/k) + end * 1.0*i/k
+            if alg == 're':
+                med = osc(med, 're')
+            else:
+                med = osc(med, 'em')
+        elif method == 'stepwise':
+            med = med * (1-1.0*i/k) + end * 1.0*i/k
+            if alg == 're':
+                med = osc(med, 're')
+            else:
+                med = osc(med, 'em')
+        add_point(ax, med)
+        add_o2p(ax, med)
+    ax.axis('equal')
+    ax.axis('scaled')
+    return 0
+
 if __name__ == '__main__':
     
     ## Demo of RE and EM Algorithms 
@@ -425,7 +442,9 @@ if __name__ == '__main__':
     #conditional_demo()
     
     ## Demo of Morphing
-
+    #morphing_demo(method='simple')
+    #morphing_demo(method='blending', alg='re')
+    #morphing_demo(method='stepwise', alg='re')
 
     data_mat = csv2mat('./cars.csv', 'Car')
     attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
