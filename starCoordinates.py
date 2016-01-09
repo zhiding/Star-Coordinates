@@ -105,7 +105,7 @@ def figure(np_coord, np_data, attrs):
         ## points
         ax.plot(np_coord[0,i], np_coord[1,i], 'o', color='#7FFFD4')
         ## annotations
-        ax.annotate(attrs[i], xy=(np_coord[0,i], np_coord[1,i]))
+        #ax.annotate(attrs[i], xy=(np_coord[0,i], np_coord[1,i]))
         ## circles 
         r = math.sqrt(np_coord[0,i]*np_coord[0,i]+np_coord[1,i]*np_coord[1,i])
         if r > r_max:
@@ -323,10 +323,10 @@ def conditional_demo():
     ax_direct.axis('equal')
     return 0
 
-def add_point(ax, coords, color='#7FFFD4'):
+def add_point(ax, coords, color='#7FFFD4', marker='o', markersize=5):
     dims = coords.size / 2
     for i in range(dims):
-        ax.plot(coords[0,i], coords[1,i], 'o', color=color)
+        ax.plot(coords[0,i], coords[1,i], marker=marker, markersize=markersize, color=color)
     return 0
 
 def add_circle(ax, coords):
@@ -481,14 +481,14 @@ def application_demo():
 
     fig_s = plot.figure()
     ax_s = fig_s.add_subplot(111)
-    add_point(ax_s, data1, color='#FFCC5C')
-    add_point(ax_s, data2, color='#66CCFF')
-    add_point(ax_s, data3, color='#68C4AF')
     add_point(ax_s, start)
     add_point(ax_s, end[:,3], color='#F98614')
     add_o2p(ax_s, start)
     add_o2p(ax_s, end[:,3])
     add_p2p(ax_s, start[:,3], end[:,3])
+    add_point(ax_s, data1, color='#FFCC5C')
+    add_point(ax_s, data2, color='#66CCFF')
+    add_point(ax_s, data3, color='#68C4AF')
     add_circle(ax_s, start)
     ax_s.axis('equal')
     ax_s.axis('scaled')
@@ -507,35 +507,36 @@ def application_demo():
         d3 = A*data3 
         fig = plot.figure()
         ax = fig.add_subplot(111)
+        add_point(ax, e)
+        add_o2p(ax, e)
         add_point(ax, d1, color='#FFCC5C')
         add_point(ax, d2, color='#66CCFF')
         add_point(ax, d3, color='#68C4AF')
-        add_point(ax, e)
-        add_o2p(ax, e)
         add_circle(ax, e)
         ax.axis('equal')
         ax.axis('scaled')
-    k = 50
-    for e in ends:
-        fig_m = plot.figure()
-        ax_m = fig_m.add_subplot(111)
-        med = start.copy()
-        for i in range(k+1):
-            med = med * (1-1.0*i/k) + end * 1.0*i/k
-            med = osc(med, 'em')
-            mA = med*inv
-            cos = 0.5*(A[0,0]+A[1,1])
-            A = np.matrix([[cos, -math.sqrt(1-cos**2)],[math.sqrt(1-cos**2), cos]])
-            d1 = A*data1 
-            d2 = A*data2 
-            d3 = A*data3 
-            add_point(ax, d1, color='#FFCC5C')
-            add_point(ax, d2, color='#66CCFF')
-            add_point(ax, d3, color='#68C4AF')
-            add_point(ax_m , med)
-            add_o2p(ax_m, med)
-        ax_m.axis('equal')
-        ax_m.axis('scaled')
+    k = 100
+    e = end1
+    fig_m = plot.figure()
+    ax_m = fig_m.add_subplot(111)
+    med = start.copy()
+    for i in range(k+1):
+        print i
+        med = med * (1-1.0*i/k) + e * 1.0*i/k
+        med = osc(med, 'em')
+        mA = med*inv
+        cos = 0.5*(A[0,0]+A[1,1])
+        A = np.matrix([[cos, -math.sqrt(1-cos**2)],[math.sqrt(1-cos**2), cos]])
+        d1 = mA*data1 
+        d2 = mA*data2 
+        d3 = mA*data3 
+        add_point(ax_m , med)
+        add_o2p(ax_m, med)
+        add_point(ax_m, d1, color='#FFCC5C', marker='.')
+        add_point(ax_m, d2, color='#66CCFF', marker='.')
+        add_point(ax_m, d3, color='#68C4AF', marker='.')
+    ax_m.axis('equal')
+    ax_m.axis('scaled')
     return 0
 
 if __name__ == '__main__':
@@ -551,27 +552,34 @@ if __name__ == '__main__':
     
     ## Demo of Morphing
     #morphing_demo(method='simple')
-    #morphing_demo(method='blending', alg='end    #morphing_demo(method='stepwise', alg='re')
+    #morphing_demo(method='blending', alg='re') 
+    #morphing_demo(method='stepwise', alg='re')
 
-    ## Demo 
-    application_demo()
+    ## Demo of Applications 
+    #application_demo()
     
-
+    ## Demo of DataSet
     data_mat = csv2mat('./cars.csv', 'Car')
-    attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
+    #attrs = ['MGP', 'Cylinders', 'Displacement', 'HorsePower', 'Weight', 'Acceleration', 'Model', 'Origin']
+    attrs = []
     #data_mat = csv2mat('./test.csv', 'Test')
     data_mat_reg = dataRegulization(data_mat)
     np_mat = np.matrix(data_mat_reg)
     num_of_attrs = len(data_mat[0])
     ## nD -> 2D
-    np_cc = nD2cc(num_of_attrs)
-    ## origin coords
-    ##coordsFigure(np_ori, attrs)
-    #print costFunc(np_gen)
-    ##figure(np_gen, np_mat, attrs)
-    #np_gen = osc(np_cc, 'Leh_re')
-    #print costFunc(np_gen)
-    #figure(np_gen, np_mat, attrs)
+    np_ori = nD2cc(num_of_attrs)
+    figure(np_ori, np_mat, attrs)
+    np_gen = np_ori.copy()
+    np_gen = osc(np_ori, 'em', fix=[7])
+    figure(np_gen, np_mat, attrs)
+    np_gen[:,7] = np_gen[:,7]+[[0.4],[0.2]]
+    np_gen = osc(np_gen, 'em', fix=[7])
+    figure(np_gen, np_mat, attrs)
+    np_gen = osc(np_ori, 'em', fix=[2,4])
+    figure(np_gen, np_mat, attrs)
+    np_gen[:,7] = np_gen[:,7]+[[0.4],[0.2]]
+    np_gen = osc(np_gen, 'em', fix=[7,2])
+    figure(np_gen, np_mat, attrs)
     #np_gen = osc(np_cc, 're', [7])
     #figure(np_gen, np_mat, attrs)
     ##[osc_rad, osc_sca] = FRND(np_cc,np_ori, 7)
